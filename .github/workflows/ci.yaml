@@ -81,6 +81,8 @@ jobs:
           toolchain: ${{ matrix.rust }}
           targets: wasm32-unknown-unknown
       - run: cargo check --verbose --target wasm32-unknown-unknown
+        env:
+          RUSTFLAGS: ${{ matrix.rustflags }}
 
   # wasm32-wasi can test the fallback by running in wasmtime.
   wasi:
