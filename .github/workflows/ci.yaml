@@ -81,7 +81,6 @@ jobs:
           toolchain: ${{ matrix.rust }}
           targets: wasm32-unknown-unknown
       - run: cargo check --verbose --target wasm32-unknown-unknown
-      - run: curl https://wasmtime.dev/install.sh -sSf | bash
 
   # wasm32-wasi can test the fallback by running in wasmtime.
   wasi:
