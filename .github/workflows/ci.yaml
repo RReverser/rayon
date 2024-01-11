@@ -99,13 +99,13 @@ jobs:
           targets: ${{ matrix.target }}
       - name: Set default target and runner
         run: |
-          echo <<EOF
+          cat << EOF > ~/.cargo/config.toml
           [build]
           target = "${{ matrix.target }}"
 
           [target.${{ matrix.target }}]
           runner = "/home/runner/.wasmtime/bin/wasmtime"
-          EOF >> ~/.cargo/config.toml
+          EOF
       - run: cargo test --verbose --package rayon
       - run: cargo test --verbose --package rayon-core
 
