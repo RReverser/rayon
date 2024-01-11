@@ -103,8 +103,11 @@ jobs:
           [build]
           target = "${{ matrix.target }}"
 
-          [target.${{ matrix.target }}]
-          runner = "/home/runner/.wasmtime/bin/wasmtime"
+          [target.wasm32-wasi]
+          runner = "wasmtime"
+
+          [target.wasm32-wasi-preview1-threads]
+          runner = ["wasmtime", "-Sthreads"]
           EOF
       - run: cargo test --verbose --package rayon
       - run: cargo test --verbose --package rayon-core
