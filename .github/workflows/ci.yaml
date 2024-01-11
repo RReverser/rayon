@@ -1,5 +1,5 @@
 name: CI
-on: merge_group
+on: [merge_group, push]
 
 jobs:
 
