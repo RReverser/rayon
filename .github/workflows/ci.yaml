@@ -65,20 +65,48 @@ jobs:
   # unsupported threading, but we don't have an environment to execute in.
   # wasm32-wasi can test the fallback by running in wasmtime.
   wasm:
-    name: WebAssembly
+    name: WebAssembly (wasm32-unknown-unknown)
     runs-on: ubuntu-latest
-    env:
-      CARGO_TARGET_WASM32_WASI_RUNNER: /home/runner/.wasmtime/bin/wasmtime
+    strategy:
+      matrix:
+        include:
+          - rust: stable
+            rustflags: ''
+          - rust: nightly
+            rustflags: '-C target-feature=+atomics,+bulk-memory'
     steps:
       - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+          targets: wasm32-unknown-unknown
+      - run: cargo check --verbose --target wasm32-unknown-unknown
+      - run: curl https://wasmtime.dev/install.sh -sSf | bash
+
+  # wasm32-wasi can test the fallback by running in wasmtime.
+  wasi:
+    name: WebAssembly (WASI)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [wasm32-wasi, wasm32-wasi-preview1-threads]
+    steps:
+      - uses: actions/checkout@v3
+      - run: curl https://wasmtime.dev/install.sh -sSf | bash
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-unknown-unknown,wasm32-wasi
-      - run: cargo check --verbose --target wasm32-unknown-unknown
-      - run: cargo check --verbose --target wasm32-wasi
-      - run: curl https://wasmtime.dev/install.sh -sSf | bash
-      - run: cargo test --verbose --target wasm32-wasi --package rayon
-      - run: cargo test --verbose --target wasm32-wasi --package rayon-core
+          targets: ${{ matrix.target }}
+      - name: Set default target and runner
+        run: |
+          echo <<EOF
+          [build]
+          target = "${{ matrix.target }}"
+
+          [target.${{ matrix.target }}]
+          runner = "/home/runner/.wasmtime/bin/wasmtime"
+          EOF >> ~/.cargo/config.toml
+      - run: cargo test --verbose --package rayon
+      - run: cargo test --verbose --package rayon-core
 
   fmt:
     name: Format
