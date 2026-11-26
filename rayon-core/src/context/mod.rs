@@ -15,5 +15,10 @@ mod imp;
 pub use imp::CapturedContext;
 pub(crate) use imp::*;
 
+#[cfg(feature = "tracing")]
+mod tracing;
+#[cfg(feature = "tracing")]
+pub use self::tracing::TracingSpan;
+
 #[cfg(all(test, feature = "context-propagation"))]
 mod test;

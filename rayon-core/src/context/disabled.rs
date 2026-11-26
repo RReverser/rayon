@@ -13,6 +13,11 @@ impl JobContext {
     }
 
     #[inline(always)]
+    pub(crate) fn capture_scoped(_registry: &Registry) -> Self {
+        JobContext
+    }
+
+    #[inline(always)]
     pub(crate) fn run(&self, f: impl FnOnce()) {
         f()
     }

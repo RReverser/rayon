@@ -89,13 +89,15 @@ where
     F: FnOnce(bool) -> R + Send,
     R: Send,
 {
-    /// Creates a job, capturing the current context for `registry`.
+    /// Creates a job, capturing the current context for `registry`. Stack
+    /// jobs are always waited for by the frame that creates them, so this
+    /// uses `capture_scoped`.
     pub(super) fn new(registry: &Registry, func: F, latch: L) -> StackJob<L, F, R> {
         StackJob {
             latch,
             func: UnsafeCell::new(Some(func)),
             result: UnsafeCell::new(JobResult::None),
-            context: JobContext::capture(registry),
+            context: JobContext::capture_scoped(registry),
         }
     }
 
@@ -151,7 +153,9 @@ impl<BODY> HeapJob<BODY>
 where
     BODY: FnOnce() + Send,
 {
-    /// Creates a job, capturing the current context for `registry`.
+    /// Creates a job, capturing the current context for `registry`. Nothing
+    /// waits for a `spawn`, and the frame creating a scope spawn can return
+    /// before it runs, so this uses `capture`.
     pub(super) fn new(registry: &Registry, job: BODY) -> Box<Self> {
         Box::new(HeapJob {
             job,
@@ -201,7 +205,10 @@ impl<BODY> ArcJob<BODY>
 where
     BODY: Fn() + Send + Sync,
 {
-    /// Creates a job, capturing the current context for `registry`.
+    /// Creates a job, capturing the current context for `registry`. Nothing
+    /// waits for a `spawn_broadcast`, and the frame calling a scope's
+    /// `spawn_broadcast` can return before the job runs, so this uses
+    /// `capture`.
     pub(super) fn new(registry: &Registry, job: BODY) -> Arc<Self> {
         Arc::new(ArcJob {
             job,

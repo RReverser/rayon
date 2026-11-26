@@ -32,7 +32,7 @@ jobs:
       - run: cargo build --verbose
       - run: cargo test --verbose --package rayon
       - run: cargo test --verbose --package rayon-core
-      - run: cargo test --verbose --package rayon --package rayon-core --features context-propagation
+      - run: cargo test --verbose --package rayon --package rayon-core --features tracing
       - run: ./ci/highlander.sh
 
   miri:

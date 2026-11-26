@@ -84,6 +84,8 @@ mod test;
 pub use self::broadcast::{BroadcastContext, broadcast, spawn_broadcast};
 #[cfg(feature = "context-propagation")]
 pub use self::context::CapturedContext;
+#[cfg(feature = "tracing")]
+pub use self::context::TracingSpan;
 pub use self::join::{join, join_context};
 pub use self::registry::ThreadBuilder;
 pub use self::scope::{Scope, in_place_scope, scope};
@@ -195,7 +197,7 @@ pub struct ThreadPoolBuilder<S = DefaultSpawn> {
 
     /// Propagates thread-local context into jobs.
     #[cfg(feature = "context-propagation")]
-    capture_context: Option<context::CaptureFn>,
+    capture_context: Option<context::CaptureFns>,
 
     /// If false, worker threads will execute spawned jobs in a
     /// "depth-first" fashion. If true, they will do a "breadth-first"
@@ -673,7 +675,7 @@ impl<S> ThreadPoolBuilder<S> {
     /// this pool. See [`CapturedContext`].
     #[cfg(feature = "context-propagation")]
     pub fn propagate_context<C: CapturedContext>(mut self) -> Self {
-        self.capture_context = Some(|| context::JobContext::new(C::capture()));
+        self.capture_context = Some(context::CaptureFns::of::<C>());
         self
     }
 }

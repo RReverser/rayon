@@ -29,14 +29,19 @@ web_spin_lock = ["dep:wasm_sync"]
 # the job paths are compiled exactly as before.
 context-propagation = []
 
+# Adds `TracingSpan`, a ready-made `CapturedContext` for `tracing` spans.
+tracing = ["context-propagation", "dep:tracing"]
+
 [dependencies]
 crossbeam-deque.workspace = true
 crossbeam-utils.workspace = true
 wasm_sync = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
 rand.workspace = true
 scoped-tls.workspace = true
+tracing-subscriber.workspace = true
 
 [target.'cfg(unix)'.dev-dependencies]
 libc.workspace = true

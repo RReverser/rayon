@@ -18,10 +18,9 @@ use crate::registry::Registry;
 /// Without the `context-propagation` cargo feature, none of this exists and
 /// jobs are compiled exactly as before. With the feature, every job is two
 /// pointers larger, and a pool without a context type pays a branch where each
-/// job is created, run and dropped. When one is installed,
-/// [`capture`](Self::capture) runs for every job, including the many that end
-/// up running on the same thread, so it should be cheap; when it returns
-/// [`Some`], the value is boxed.
+/// job is created, run and dropped. When one is installed, a capture method
+/// runs for every job, including the many that end up running on the same
+/// thread, so it should be cheap; when it returns [`Some`], the value is boxed.
 ///
 /// # Example
 ///
@@ -78,6 +77,21 @@ pub trait CapturedContext: Sized + Send + Sync + 'static {
     /// the value must keep whatever it refers to alive by itself.
     fn capture() -> Option<Self>;
 
+    /// Like [`capture`](Self::capture), for a job that finishes before the
+    /// rayon call that created it ([`join`](crate::join),
+    /// [`install`](crate::ThreadPool::install),
+    /// [`broadcast`](crate::broadcast)) returns on this thread.
+    ///
+    /// Anything this thread keeps alive at the moment of capture, such as the
+    /// span it is currently inside, therefore outlives the job, so the
+    /// returned value doesn't need to keep it alive, and is only valid until
+    /// that call returns. This is where most jobs come from (every split of a
+    /// parallel iterator), so it is the place to avoid costs such as reference
+    /// counting. Defaults to [`capture`](Self::capture).
+    fn capture_scoped() -> Option<Self> {
+        Self::capture()
+    }
+
     /// Runs `f` with this context made current on this thread. Must call `f`
     /// exactly once, then restore this thread's previous state, as the thread
     /// goes on to run other jobs.
@@ -90,6 +104,24 @@ pub trait CapturedContext: Sized + Send + Sync + 'static {
 /// Captures the context of the type installed on a pool, type-erased. A plain
 /// function pointer, so the registry doesn't need to be generic over that type.
 pub(crate) type CaptureFn = fn() -> JobContext;
+
+/// Type-erased capture functions of the context type installed on a pool.
+/// Stored in the registry.
+#[derive(Clone, Copy)]
+pub(crate) struct CaptureFns {
+    capture: CaptureFn,
+    capture_scoped: CaptureFn,
+}
+
+impl CaptureFns {
+    /// The capture functions of `C`.
+    pub(crate) fn of<C: CapturedContext>() -> Self {
+        CaptureFns {
+            capture: || JobContext::new(C::capture()),
+            capture_scoped: || JobContext::new(C::capture_scoped()),
+        }
+    }
+}
 
 /// Object-safe form of [`CapturedContext`], whose `run` is generic over `f`
 /// and so can't be called on a trait object.
@@ -111,7 +143,7 @@ pub(crate) struct JobContext(Option<Box<dyn DynContext>>);
 impl JobContext {
     /// Type-erases a captured context. (`Option::map(Box::new)` wouldn't coerce
     /// the box to `dyn DynContext`, hence the `match`.)
-    pub(crate) fn new(context: Option<impl CapturedContext>) -> Self {
+    fn new(context: Option<impl CapturedContext>) -> Self {
         JobContext(match context {
             Some(context) => Some(Box::new(context)),
             None => None,
@@ -119,12 +151,21 @@ impl JobContext {
     }
 
     /// Captures the current context with the context type of `registry`, if
-    /// it has one.
+    /// it has one, for a job that may outlive the call creating it.
     #[inline]
     pub(crate) fn capture(registry: &Registry) -> Self {
         registry
             .capture_context
-            .map_or(JobContext(None), |capture| capture())
+            .map_or(JobContext(None), |fns| (fns.capture)())
+    }
+
+    /// Like [`capture`](Self::capture), for a job that finishes before the
+    /// call creating it returns.
+    #[inline]
+    pub(crate) fn capture_scoped(registry: &Registry) -> Self {
+        registry
+            .capture_context
+            .map_or(JobContext(None), |fns| (fns.capture_scoped)())
     }
 
     /// Runs `f` with the captured context, if any, made current.

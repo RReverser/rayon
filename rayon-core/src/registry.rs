@@ -132,7 +132,7 @@ pub(super) struct Registry {
     start_handler: Option<Box<StartHandler>>,
     exit_handler: Option<Box<ExitHandler>>,
     #[cfg(feature = "context-propagation")]
-    pub(super) capture_context: Option<crate::context::CaptureFn>,
+    pub(super) capture_context: Option<crate::context::CaptureFns>,
 
     // When this latch reaches 0, it means that all work on this
     // registry must be complete. This is ensured in the following ways:
