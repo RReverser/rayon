@@ -89,7 +89,7 @@ where
     // executed. This ref is decremented at the (*) below.
     registry.increment_terminate_count();
 
-    HeapJob::new({
+    HeapJob::new(registry, {
         let registry = Arc::clone(registry);
         move || {
             registry.catch_unwind(func);

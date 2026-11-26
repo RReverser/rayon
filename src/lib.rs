@@ -104,6 +104,8 @@ mod par_either;
 
 mod compile_fail;
 
+#[cfg(feature = "context-propagation")]
+pub use rayon_core::CapturedContext;
 pub use rayon_core::FnContext;
 pub use rayon_core::ThreadBuilder;
 pub use rayon_core::ThreadPool;

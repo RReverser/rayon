@@ -23,6 +23,9 @@ workspace = true
 # Only useful on the `wasm32-unknown-unknown` target.
 web_spin_lock = ["dep:wasm_sync", "rayon-core/web_spin_lock"]
 
+# Enables `ThreadPoolBuilder::propagate_context`, see `rayon-core`.
+context-propagation = ["rayon-core/context-propagation"]
+
 [dependencies]
 # These are both public dependencies!
 rayon-core = { version = "1.13.0", path = "rayon-core" }

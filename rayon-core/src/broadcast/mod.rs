@@ -110,7 +110,7 @@ where
         let current_thread = WorkerThread::current().as_ref();
         let latch = CountLatch::with_count(n_threads, current_thread);
         let jobs: Vec<_> = (0..n_threads)
-            .map(|_| StackJob::new(&f, LatchRef::new(&latch)))
+            .map(|_| StackJob::new(registry, &f, LatchRef::new(&latch)))
             .collect();
         let job_refs = jobs.iter().map(|job| job.as_job_ref());
 
@@ -140,7 +140,7 @@ where
         op: ManuallyDrop::new(op),
     };
 
-    let job = ArcJob::new(move || {
+    let job = ArcJob::new(registry, move || {
         let op = &*guard.op;
         guard.registry.catch_unwind(|| BroadcastContext::with(op));
     });

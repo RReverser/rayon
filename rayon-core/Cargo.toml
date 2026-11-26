@@ -24,6 +24,11 @@ workspace = true
 # Only useful on the `wasm32-unknown-unknown` target.
 web_spin_lock = ["dep:wasm_sync"]
 
+# Enables `ThreadPoolBuilder::propagate_context`, which carries thread-local
+# context (such as the current `tracing` span) into jobs. Without this feature
+# the job paths are compiled exactly as before.
+context-propagation = []
+
 [dependencies]
 crossbeam-deque.workspace = true
 crossbeam-utils.workspace = true

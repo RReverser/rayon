@@ -1,4 +1,6 @@
+use crate::context::JobContext;
 use crate::latch::Latch;
+use crate::registry::Registry;
 use crate::unwind;
 use crossbeam_deque::{Injector, Steal};
 use std::any::Any;
@@ -78,6 +80,7 @@ where
     pub(super) latch: L,
     func: UnsafeCell<Option<F>>,
     result: UnsafeCell<JobResult<R>>,
+    context: JobContext,
 }
 
 impl<L, F, R> StackJob<L, F, R>
@@ -86,11 +89,13 @@ where
     F: FnOnce(bool) -> R + Send,
     R: Send,
 {
-    pub(super) fn new(func: F, latch: L) -> StackJob<L, F, R> {
+    /// Creates a job, capturing the current context for `registry`.
+    pub(super) fn new(registry: &Registry, func: F, latch: L) -> StackJob<L, F, R> {
         StackJob {
             latch,
             func: UnsafeCell::new(Some(func)),
             result: UnsafeCell::new(JobResult::None),
+            context: JobContext::capture(registry),
         }
     }
 
@@ -118,7 +123,10 @@ where
             let this = &*(this as *const Self);
             let abort = unwind::AbortIfPanic;
             let func = (*this.func.get()).take().unwrap();
-            (*this.result.get()) = JobResult::call(func);
+            // `JobResult::call` catches a panic from `func`, so the closure
+            // given to `run` doesn't panic.
+            let result = this.result.get();
+            this.context.run(|| *result = JobResult::call(func));
             Latch::set(&this.latch);
             mem::forget(abort);
         }
@@ -136,14 +144,19 @@ where
     BODY: FnOnce() + Send,
 {
     job: BODY,
+    context: JobContext,
 }
 
 impl<BODY> HeapJob<BODY>
 where
     BODY: FnOnce() + Send,
 {
-    pub(super) fn new(job: BODY) -> Box<Self> {
-        Box::new(HeapJob { job })
+    /// Creates a job, capturing the current context for `registry`.
+    pub(super) fn new(registry: &Registry, job: BODY) -> Box<Self> {
+        Box::new(HeapJob {
+            job,
+            context: JobContext::capture(registry),
+        })
     }
 
     /// Creates a `JobRef` from this job -- note that this hides all
@@ -169,7 +182,7 @@ where
     unsafe fn execute(this: *const ()) {
         unsafe {
             let this = Box::from_raw(this as *mut Self);
-            (this.job)();
+            this.context.run(this.job);
         }
     }
 }
@@ -181,14 +194,19 @@ where
     BODY: Fn() + Send + Sync,
 {
     job: BODY,
+    context: JobContext,
 }
 
 impl<BODY> ArcJob<BODY>
 where
     BODY: Fn() + Send + Sync,
 {
-    pub(super) fn new(job: BODY) -> Arc<Self> {
-        Arc::new(ArcJob { job })
+    /// Creates a job, capturing the current context for `registry`.
+    pub(super) fn new(registry: &Registry, job: BODY) -> Arc<Self> {
+        Arc::new(ArcJob {
+            job,
+            context: JobContext::capture(registry),
+        })
     }
 
     /// Creates a `JobRef` from this job -- note that this hides all
@@ -214,7 +232,7 @@ where
     unsafe fn execute(this: *const ()) {
         unsafe {
             let this = Arc::from_raw(this as *mut Self);
-            (this.job)();
+            this.context.run(&this.job);
         }
     }
 }

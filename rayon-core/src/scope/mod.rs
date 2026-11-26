@@ -655,7 +655,7 @@ where
     // TODO: use `MaybeDangling` when that's stable in our MSRV.
     let body = MaybeUninit::new(body);
     let scope_ptr = ScopePtr(scope);
-    let job = HeapJob::new(move || unsafe {
+    let job = HeapJob::new(&scope.base().registry, move || unsafe {
         // SAFETY: this job will execute before the scope ends.
         let base = scope_ptr.base_ptr();
         ScopeBase::execute_job(base, move || {
@@ -844,7 +844,7 @@ where
             marker: PhantomData,
         };
 
-        let job = ArcJob::new(move || unsafe {
+        let job = ArcJob::new(&base.registry, move || unsafe {
             // SAFETY: the guard keeps the scope alive.
             let scope = guard.scope_ptr.as_ref();
             let body = &*guard.body;

@@ -67,6 +67,7 @@ use std::str::FromStr;
 use std::thread;
 
 mod broadcast;
+mod context;
 mod job;
 mod join;
 mod latch;
@@ -81,6 +82,8 @@ mod compile_fail;
 mod test;
 
 pub use self::broadcast::{BroadcastContext, broadcast, spawn_broadcast};
+#[cfg(feature = "context-propagation")]
+pub use self::context::CapturedContext;
 pub use self::join::{join, join_context};
 pub use self::registry::ThreadBuilder;
 pub use self::scope::{Scope, in_place_scope, scope};
@@ -190,6 +193,10 @@ pub struct ThreadPoolBuilder<S = DefaultSpawn> {
     /// Closure invoked to spawn threads.
     spawn_handler: S,
 
+    /// Propagates thread-local context into jobs.
+    #[cfg(feature = "context-propagation")]
+    capture_context: Option<context::CaptureFn>,
+
     /// If false, worker threads will execute spawned jobs in a
     /// "depth-first" fashion. If true, they will do a "breadth-first"
     /// fashion. Depth-first is the default.
@@ -230,6 +237,8 @@ impl Default for ThreadPoolBuilder {
             exit_handler: None,
             spawn_handler: DefaultSpawn,
             breadth_first: false,
+            #[cfg(feature = "context-propagation")]
+            capture_context: None,
         }
     }
 }
@@ -441,6 +450,8 @@ impl<S> ThreadPoolBuilder<S> {
             start_handler: self.start_handler,
             exit_handler: self.exit_handler,
             breadth_first: self.breadth_first,
+            #[cfg(feature = "context-propagation")]
+            capture_context: self.capture_context,
         }
     }
 
@@ -657,6 +668,14 @@ impl<S> ThreadPoolBuilder<S> {
         self.exit_handler = Some(Box::new(exit_handler));
         self
     }
+
+    /// Carries the thread-local context described by `C` into every job of
+    /// this pool. See [`CapturedContext`].
+    #[cfg(feature = "context-propagation")]
+    pub fn propagate_context<C: CapturedContext>(mut self) -> Self {
+        self.capture_context = Some(|| context::JobContext::new(C::capture()));
+        self
+    }
 }
 
 #[expect(deprecated)]
@@ -796,6 +815,8 @@ impl<S> fmt::Debug for ThreadPoolBuilder<S> {
             ref exit_handler,
             spawn_handler: _,
             ref breadth_first,
+            #[cfg(feature = "context-propagation")]
+                capture_context: _,
         } = *self;
 
         // Just print `Some(<closure>)` or `None` to the debug

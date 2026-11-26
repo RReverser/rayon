@@ -131,6 +131,8 @@ pub(super) struct Registry {
     panic_handler: Option<Box<PanicHandler>>,
     start_handler: Option<Box<StartHandler>>,
     exit_handler: Option<Box<ExitHandler>>,
+    #[cfg(feature = "context-propagation")]
+    pub(super) capture_context: Option<crate::context::CaptureFn>,
 
     // When this latch reaches 0, it means that all work on this
     // registry must be complete. This is ensured in the following ways:
@@ -275,6 +277,8 @@ impl Registry {
             panic_handler: builder.take_panic_handler(),
             start_handler: builder.take_start_handler(),
             exit_handler: builder.take_exit_handler(),
+            #[cfg(feature = "context-propagation")]
+            capture_context: builder.capture_context,
         });
 
         // If we return early or panic, make sure to terminate existing threads.
@@ -523,6 +527,7 @@ impl Registry {
             // This thread isn't a member of *any* thread pool, so just block.
             debug_assert!(WorkerThread::current().is_null());
             let job = StackJob::new(
+                self,
                 |injected| {
                     let worker_thread = WorkerThread::current();
                     assert!(injected && !worker_thread.is_null());
@@ -549,6 +554,7 @@ impl Registry {
             debug_assert!(current_thread.registry().id() != self.id());
             let latch = SpinLatch::cross(current_thread);
             let job = StackJob::new(
+                self,
                 |injected| {
                     let worker_thread = WorkerThread::current();
                     assert!(injected && !worker_thread.is_null());
